@@ -1,0 +1,16 @@
+{
+  "name": "azure-queue-work",
+  "version": "1.0.0",
+  "description": "",
+  "main": "AzureListener.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/service-bus": "^7.5.0",
+    "dotenv": "^16.0.0",
+    "mongoose": "^6.2.4"
+  }
+}
