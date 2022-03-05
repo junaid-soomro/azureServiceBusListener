@@ -47,8 +47,8 @@ const mainFunction = async () => {
           console.log("MESSAGES", message);
           if ("collection" in message.body && "data" in message.body) {
             let { collection, ...other } = message.body;
-            if ("orgid" in message.body) {
-              collection = message.body.orgid + "_" + collection;
+            if ("orgId" in message.body) {
+              collection = message.body.orgId + "_" + collection;
             }
 
             await dumpToDb(collection, other);
