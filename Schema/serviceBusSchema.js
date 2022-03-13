@@ -1,21 +1,11 @@
 var mongoose = require("mongoose");
 var Schema = mongoose.Schema;
 
+const dbSchema = new Schema({ id: Number }, { strict: false });
+
 const schemaGenerator = async (schemaName) => {
-  const listOfCollections = await mongoose.connection.db.collections();
+  collection = await mongoose.model(schemaName, dbSchema, schemaName);
 
-  let collection = null;
-  collection =
-    listOfCollections &&
-    listOfCollections.find((item) => item.collectionName == schemaName);
-
-  if (!collection) {
-    collection = await mongoose.model(
-      schemaName,
-      new Schema({ _id: Number, data: { type: Object } }, { _id: false }),
-      schemaName
-    );
-  }
   return collection;
 };
 

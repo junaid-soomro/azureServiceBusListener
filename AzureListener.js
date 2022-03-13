@@ -1,66 +1,46 @@
-const dumpToDb = require("./dumpMessage").dumpEventToDatabase;
-const {
-  delay,
-  ServiceBusClient,
-  ServiceBusAdministrationClient,
-} = require("@azure/service-bus");
+const saveToDb = require("./saveMessage").saveEventToDatabase;
+const { delay, ServiceBusClient } = require("@azure/service-bus");
 require("dotenv").config();
 
-//Process termination listeners
-
-const mainFunction = async () => {
+(async () => {
   if (!(await require("./singletonConnection").getConnection())) {
     await require("./singletonConnection").initConnection();
   }
-  const connectionString = process.env.AZURE_CONNECTION_STRING;
   const topicName = process.env.TOPIC_NAME;
 
+  //need a subscription name here
   const subscriptionName = "testSubscription";
-
-  //One for managing subscriptions and the other for recieving purposes.
-  const serviceBusAdministrationClient = new ServiceBusAdministrationClient(
-    connectionString
+  const serviceClient = new ServiceBusClient(
+    process.env.AZURE_CONNECTION_STRING
   );
-
-  const serviceClient = new ServiceBusClient(connectionString);
-  let subscription = null;
-  subscription = await serviceBusAdministrationClient
-    .getSubscription(topicName, subscriptionName)
-    .catch((err) => console.log("Subscription does not exist. Creating.."));
-
-  if (!subscription) {
-    await serviceBusAdministrationClient
-      .createSubscription(topicName, subscriptionName)
-      .catch((err) => {
-        console.log("Failed to subscribe to topic: ", err);
-      });
-  }
   const receiver = serviceClient.createReceiver(topicName, subscriptionName);
   console.log("Awaiting MESSAGES...");
-
-  let receivingMessages = true;
-  const interval = setInterval(async () => {
-    if (receivingMessages) {
-      receivingMessages = false;
-      try {
-        for await (let message of receiver.getMessageIterator()) {
-          console.log("MESSAGES", message);
-          if ("collection" in message.body && "data" in message.body) {
-            let { collection, ...other } = message.body;
-            if ("orgId" in message.body) {
-              collection = message.body.orgId + "_" + collection;
-            }
-
-            await dumpToDb(collection, other);
-            await receiver.completeMessage(message);
-            receivingMessages = true;
-          }
-        }
-      } catch (e) {
-        receivingMessages = false;
+  const myMessageHandler = async (message) => {
+    console.log("MESSAGES", message);
+    if ("collection" in message.body && "data" in message.body) {
+      let { collection, ...other } = message.body;
+      if ("orgId" in message.body) {
+        collection = message.body.orgId + "_" + collection;
       }
+
+      await saveToDb(collection, other);
+      await receiver.completeMessage(message);
     }
-  }, 5000);
+  };
+  const myErrorHandler = async (args) => {
+    console.log(
+      `Error occurred with ${args.entityPath} within ${args.fullyQualifiedNamespace}: `,
+      args.error
+    );
+  };
+  receiver.subscribe({
+    processMessage: myMessageHandler,
+    processError: myErrorHandler,
+  });
+
+  // a smart tweak to make the application behave as a listener because azure javascript library does not provide asynchronous listening for queues and topics.
+  let interval = setInterval(async () => await delay(3999), 4000);
+  await delay(5000);
 
   process.on("SIGINT", async () => {
     console.log("TERMINATING JOB.");
@@ -77,8 +57,5 @@ const mainFunction = async () => {
     await serviceClient.close();
     process.exit(1);
   });
-
   console.log("JOB RUNNING.");
-};
-
-mainFunction();
+})();
